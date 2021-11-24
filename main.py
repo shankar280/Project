@@ -1,4 +1,4 @@
-#IMPORTING LIBRARIES
+
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox as mess
@@ -11,7 +11,7 @@ import pandas as pd
 import datetime
 import time
 
-# DEFINED FUNCTIONS
+
 
 def assure_path_exists(path):
     dir = os.path.dirname(path)
