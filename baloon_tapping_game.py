@@ -33,6 +33,9 @@ small_font = pygame.font.SysFont("Arial", 20)
 game_running = False
 in_menu = True
 game_speed = 60
+time_limit = 30  # Game time limit in seconds
+time_left = time_limit  # Countdown timer
+paused = False  # Track if the game is paused
 
 def display_message(text, x, y, color=BLACK):
     """Display text on the screen"""
@@ -84,9 +87,11 @@ def set_speed_fast():
     game_speed = 90
 
 def start_game():
-    global in_menu, game_running
+    global in_menu, game_running, time_left, paused
     game_running = True
     in_menu = False  # Exit the menu
+    time_left = time_limit  # Reset the timer
+    paused = False  # Ensure the game is not paused when starting
 
 def quit_game():
     pygame.quit()
@@ -102,7 +107,7 @@ class Balloon(pygame.sprite.Sprite):
         self.speed = random.randint(2, 5)
 
     def update(self):
-        if game_running:  # Only move balloons if game is running
+        if game_running and not paused:  # Only move balloons if game is running and not paused
             self.rect.y -= self.speed  # Move balloon up
             if self.rect.bottom < 0:  # Reset balloon when it moves off screen
                 self.reset_balloon()
@@ -127,7 +132,7 @@ for _ in range(10):
     balloon_group.add(balloon)
 
 def main():
-    global game_speed, game_running, in_menu
+    global game_speed, game_running, in_menu, time_left, paused
     clock = pygame.time.Clock()
     score = 0
     game_speed = 60  # Default speed
@@ -159,33 +164,55 @@ def main():
             # Update
             balloon_group.update()
 
+            # Countdown Timer
+            if time_left > 0 and not paused:
+                time_left -= 1 / FPS  # Decrease time every frame
+            else:
+                game_running = False  # Stop the game when time is up
+
             # Draw
             balloon_group.draw(screen)
             display_message(f"Score: {score}", 10, 10)
             display_message(f"Tap {target_color_name} balloons!", 10, 50, TARGET_COLOR)
+            display_message(f"Time Left: {int(time_left)}", WIDTH - 160, HEIGHT - 40, BLACK)  # Timer on bottom-right
             button("Pause", WIDTH - 160, 10, 150, 50, GRAY, YELLOW, pause_game)
 
             # Refresh screen
             pygame.display.flip()
             clock.tick(game_speed)
 
-        while not game_running:  # Pause state
-            screen.fill(WHITE)
-            display_message("Game Paused", WIDTH // 2 - 100, HEIGHT // 2 - 50)
-            button("Resume", WIDTH // 2 - 75, HEIGHT // 2, 150, 50, GRAY, GREEN, resume_game)
-            button("Quit", WIDTH // 2 - 75, HEIGHT // 2 + 60, 150, 50, GRAY, RED, quit_game)
-            pygame.display.update()
+        while not game_running:  # Pause state or Game Over
+            if time_left <= 0:  # Time is up, show game over screen with return to menu
+                screen.fill(WHITE)
+                display_message("Game Over", WIDTH // 2 - 100, HEIGHT // 2 - 50)
+                button("Return to Menu", WIDTH // 2 - 75, HEIGHT // 2, 150, 50, GRAY, GREEN, return_to_menu)
+                pygame.display.update()
+            else:  # Paused state, show resume or quit options
+                screen.fill(WHITE)
+                display_message("Game Paused", WIDTH // 2 - 100, HEIGHT // 2 - 50)
+                button("Resume", WIDTH // 2 - 75, HEIGHT // 2, 150, 50, GRAY, GREEN, resume_game)
+                button("Quit", WIDTH // 2 - 75, HEIGHT // 2 + 60, 150, 50, GRAY, RED, quit_game)
+                pygame.display.update()
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     quit_game()
 
 def pause_game():
-    global game_running
+    global game_running, paused
+    paused = True
     game_running = False
 
 def resume_game():
-    global game_running
+    global game_running, paused
+    paused = False
     game_running = True
+
+def return_to_menu():
+    global game_running, in_menu, time_left
+    game_running = False  # Stop the game
+    in_menu = True  # Go back to the main menu
+    time_left = time_limit  # Reset the timer
 
 if __name__ == "__main__":
     main()
