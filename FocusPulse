@@ -35,6 +35,7 @@ clock = pygame.time.Clock()
 target_appear_time = 1  # Default pop-up time
 start_time = time.time()
 tap_count = 0
+wrong_tap_count = 0
 total_attempts = 0
 attempts_over_time = []  # Track attempts over time
 correct_over_time = []  # Track correct taps over time
@@ -102,7 +103,10 @@ def main_menu():
         pygame.display.flip()
         clock.tick(30)
 
-main_menu()
+    return TARGET_COLOR, GAME_TIME
+
+# Start game
+TARGET_COLOR, GAME_TIME = main_menu()
 
 # Start the game
 game_start_time = time.time()
@@ -127,6 +131,7 @@ while running:
                     tap_count += 1
                     correct_tap_points.append((time.time() - game_start_time, tap_count))
                 else:
+                    wrong_tap_count += 1
                     wrong_tap_points.append((time.time() - game_start_time, total_attempts + 1))
                 total_attempts += 1
                 clicked_this_round = True
@@ -165,8 +170,17 @@ while running:
 
 # End game screen
 screen.fill(WHITE)
-draw_message(f"Game Over! Your score: {tap_count}/{total_attempts}", BLACK, (200, 250))
-draw_message("Press any key to exit", BLACK, (250, 300))
+
+# Calculate accuracy
+accuracy = (tap_count / total_attempts) * 100 if total_attempts > 0 else 0
+
+# Display the results
+draw_message(f"Game Over! Your score: {tap_count}/{total_attempts}", BLACK, (200, 150))
+draw_message(f"Correct Taps: {tap_count}", BLACK, (200, 200))
+draw_message(f"Wrong Taps: {wrong_tap_count}", BLACK, (200, 250))
+draw_message(f"Total Targets Appeared: {total_attempts}", BLACK, (200, 300))
+draw_message(f"Accuracy: {accuracy:.2f}%", BLACK, (200, 350))
+draw_message("Press any key to exit", BLACK, (250, 400))
 pygame.display.flip()
 
 waiting = True
