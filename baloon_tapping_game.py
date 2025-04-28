@@ -2,14 +2,14 @@ import pygame
 import random
 import sys
 
-# Initialize Pygame
+
 pygame.init()
 
-# Screen dimensions
+
 WIDTH, HEIGHT = 800, 600
 FPS = 60
 
-# Colors
+
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
@@ -19,23 +19,27 @@ YELLOW = (255, 255, 0)
 GRAY = (200, 200, 200)
 
 BALLOON_COLORS = [RED, GREEN, BLUE, YELLOW]
-TARGET_COLOR = RED  # Default target color
+TARGET_COLOR = RED  
 
-# Initialize screen
+
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Balloon Tapping Game")
 
-# Fonts
+
 font = pygame.font.SysFont("Arial", 30)
 small_font = pygame.font.SysFont("Arial", 20)
 
-# Global Variables
+
 game_running = False
 in_menu = True
 game_speed = 60
-time_limit = 30  # Game time limit in seconds
-time_left = time_limit  # Countdown timer
-paused = False  # Track if the game is paused
+time_limit = 30  
+time_left = time_limit  
+paused = False  
+correct_taps = 0
+total_target_color_balloons = 0
+score = 0
+start_ticks = None
 
 def display_message(text, x, y, color=BLACK):
     """Display text on the screen"""
@@ -53,7 +57,7 @@ def button(text, x, y, w, h, inactive_color, active_color, action=None):
     screen.blit(text_surf, text_rect)
     if click[0] == 1 and x + w > mouse[0] > x and y + h > mouse[1] > y and action is not None:
         action()
-        pygame.time.wait(200)  # Prevent multiple clicks
+        pygame.time.wait(200)
 
 def game_menu():
     """Game menu interface"""
@@ -69,7 +73,7 @@ def game_menu():
         button("Speed: Fast", WIDTH // 2 - 75, HEIGHT // 2 + 60, 150, 50, GRAY, BLUE, set_speed_fast)
         button("Quit", WIDTH // 2 - 75, HEIGHT // 2 + 120, 150, 50, GRAY, RED, quit_game)
 
-        # Color selection buttons
+        
         button("Target: Red", WIDTH // 2 - 75, HEIGHT // 2 + 180, 150, 50, RED, RED, set_target_red)
         button("Target: Green", WIDTH // 2 - 75, HEIGHT // 2 + 240, 150, 50, GREEN, GREEN, set_target_green)
         button("Target: Blue", WIDTH // 2 - 75, HEIGHT // 2 + 300, 150, 50, BLUE, BLUE, set_target_blue)
@@ -109,11 +113,15 @@ def set_target_yellow():
     TARGET_COLOR = YELLOW
 
 def start_game():
-    global in_menu, game_running, time_left, paused
+    global in_menu, game_running, time_left, paused, correct_taps, total_target_color_balloons, score, start_ticks
     game_running = True
-    in_menu = False  # Exit the menu
-    time_left = time_limit  # Reset the timer
-    paused = False  # Ensure the game is not paused when starting
+    in_menu = False
+    time_left = time_limit
+    paused = False
+    correct_taps = 0
+    total_target_color_balloons = 0
+    score = 0
+    start_ticks = pygame.time.get_ticks()
 
 def quit_game():
     pygame.quit()
@@ -125,13 +133,13 @@ class Balloon(pygame.sprite.Sprite):
         self.image = pygame.Surface((50, 70), pygame.SRCALPHA)
         pygame.draw.ellipse(self.image, color, [0, 0, 50, 70])
         self.rect = self.image.get_rect(center=(x, y))
-        self.color = color  # Keep track of balloon color
+        self.color = color
         self.speed = random.randint(2, 5)
 
     def update(self):
-        if game_running and not paused:  # Only move balloons if game is running and not paused
-            self.rect.y -= self.speed  # Move balloon up
-            if self.rect.bottom < 0:  # Reset balloon when it moves off screen
+        if game_running and not paused:
+            self.rect.y -= self.speed  
+            if self.rect.bottom < 0:  
                 self.reset_balloon()
 
     def reset_balloon(self):
@@ -139,13 +147,16 @@ class Balloon(pygame.sprite.Sprite):
         self.rect.y = HEIGHT + random.randint(10, 100)
         self.rect.x = random.randint(50, WIDTH - 50)
         self.color = random.choice(BALLOON_COLORS)
-        self.image.fill((0, 0, 0, 0))  # Clear previous drawing
+        if self.color == TARGET_COLOR: 
+            global total_target_color_balloons
+            total_target_color_balloons += 1 
+        self.image.fill((0, 0, 0, 0))  
         pygame.draw.ellipse(self.image, self.color, [0, 0, 50, 70])
 
-# Initialize sprite groups
+
 balloon_group = pygame.sprite.Group()
 
-# Create balloons
+
 for _ in range(10):
     x = random.randint(50, WIDTH - 50)
     y = random.randint(HEIGHT // 2, HEIGHT)
@@ -154,12 +165,11 @@ for _ in range(10):
     balloon_group.add(balloon)
 
 def main():
-    global game_speed, game_running, in_menu, time_left, paused, TARGET_COLOR
+    global game_speed, game_running, in_menu, time_left, paused, TARGET_COLOR, correct_taps, total_target_color_balloons, score, start_ticks
     clock = pygame.time.Clock()
-    score = 0
-    game_speed = 60  # Default speed
+    game_speed = 60  
 
-    # Determine target color name
+    
     target_color_name = "RED" if TARGET_COLOR == RED else "UNKNOWN"
     if TARGET_COLOR == GREEN:
         target_color_name = "GREEN"
@@ -170,12 +180,12 @@ def main():
 
     while True:
         if in_menu:
-            game_menu()  # Show menu before the game starts
+            game_menu()  
 
         while game_running:
             screen.fill(WHITE)
 
-            # Event handling
+            
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     quit_game()
@@ -184,58 +194,52 @@ def main():
                     for balloon in balloon_group:
                         if balloon.rect.collidepoint(pos):
                             if balloon.color == TARGET_COLOR:
-                                score += 1  # Correct balloon tapped
+                                score += 1  
+                                correct_taps += 1  
                             else:
-                                score -= 1  # Incorrect balloon tapped
-                            balloon.reset_balloon()  # Reset balloon position and color
+                                score -= 1  
+                            balloon.reset_balloon() 
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_p:  
+                        if not paused:
+                            pause_game()
+                        else:
+                            resume_game()
 
-            # Update
+            
             balloon_group.update()
 
-            # Countdown Timer
-            if time_left > 0 and not paused:
-                time_left -= 1 / FPS  # Decrease time every frame
-            else:
-                game_running = False  # Stop the game when time is up
+            
+            if not paused:
+                seconds = (pygame.time.get_ticks() - start_ticks) // 1000
+                time_left = max(0, time_limit - seconds)
 
-            # Draw
+            
+            display_message(f"Time Left: {time_left}s", 20, 20, BLACK)
+            display_message(f"Score: {score}", WIDTH - 150, 20, BLACK)
+            display_message(f"Target Color: {target_color_name}", 20, HEIGHT - 40, BLACK)
+            display_message(f"Correct Taps: {correct_taps}", WIDTH // 2 - 100, HEIGHT // 2 - 30, BLACK)
+            display_message(f"Total Target Color Balloons: {total_target_color_balloons}", WIDTH // 2 - 150, HEIGHT // 2, BLACK)
+
+            
             balloon_group.draw(screen)
-            display_message(f"Score: {score}", 10, 10)
-            display_message(f"Tap {target_color_name} balloons!", 10, 50, TARGET_COLOR)
-            display_message(f"Time Left: {int(time_left)}", WIDTH - 160, HEIGHT - 40, BLACK)
-            button("Pause", WIDTH - 160, 10, 150, 50, GRAY, YELLOW, pause_game)
 
-            # Refresh screen
-            pygame.display.flip()
+            pygame.display.update()
             clock.tick(game_speed)
 
-        while not game_running:  # Pause state
-            screen.fill(WHITE)
-            display_message("Game Paused", WIDTH // 2 - 100, HEIGHT // 2 - 50)
-            button("Resume", WIDTH // 2 - 75, HEIGHT // 2, 150, 50, GRAY, GREEN, resume_game)
-            button("Quit", WIDTH // 2 - 75, HEIGHT // 2 + 60, 150, 50, GRAY, RED, quit_game)
-            button("Return to Menu", WIDTH // 2 - 75, HEIGHT // 2 + 120, 150, 50, GRAY, BLUE, return_to_menu)
-            pygame.display.update()
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    quit_game()
-
 def pause_game():
-    global game_running, paused
+    global paused
     paused = True
-    game_running = False
+    display_message("Game Paused", WIDTH // 2 - 100, HEIGHT // 3, RED)
+    display_message("Press 'R' to resume", WIDTH // 2 - 150, HEIGHT // 3 + 50, BLACK)
+    pygame.display.update()
 
 def resume_game():
-    global game_running, paused
+    global paused
     paused = False
-    game_running = True
+    global start_ticks
+    start_ticks = pygame.time.get_ticks() - (time_limit - time_left) * 1000  # Update start_ticks to continue from where it left off
 
-def return_to_menu():
-    global game_running, in_menu, time_left, paused
-    game_running = False  # Stop the game
-    in_menu = True  # Go back to the main menu
-    time_left = time_limit  # Reset the timer
-    paused = False  # Ensure the game is not paused when returning to the menu
 
 if __name__ == "__main__":
     main()
