@@ -3,14 +3,12 @@ import random
 import time
 import matplotlib.pyplot as plt
 
-# Initialize Pygame
 pygame.init()
 
-# Screen dimensions
+
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
 
-# Colors
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 RED = (255, 0, 0)
@@ -19,51 +17,77 @@ BLUE = (0, 0, 255)
 YELLOW = (255, 255, 0)
 ORANGE = (255, 165, 0)
 PURPLE = (128, 0, 128)
+LIME_GREEN = (50, 205, 50)  
+CORAL_RED = (255, 127, 80) 
+LIGHT_GREEN = (224, 248, 224)
+current_color = None
 
-# List of colors
+
 COLORS = [RED, GREEN, BLUE, YELLOW, ORANGE, PURPLE]
 COLOR_NAMES = {RED: "Red", GREEN: "Green", BLUE: "Blue", YELLOW: "Yellow", ORANGE: "Orange", PURPLE: "Purple"}
 
-# Create screen
+
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 pygame.display.set_caption("Color Tapping Game")
 
-# Fonts
+
 font = pygame.font.Font(None, 36)
 
-# Variables
+
 clock = pygame.time.Clock()
 target_appear_time = 1
 start_time = time.time()
 correct_taps = 0
 wrong_taps = 0
-total_taps = 0  # Track the total taps (correct + wrong)
+reaction_times = []
+total_taps = 0
 correct_tap_points = []
 wrong_tap_points = []
 performance = []
 timestamps = []
-attempts_over_time = []  # Track total attempts over time
+attempts_over_time = []
 clicked_this_round = False
 TARGET_COLOR = None
-GAME_TIME = 30
+target_appearance_time = None
+GAME_TIME = 60
+total_targets = 0
+difficulty_level = "Easy"
+target_appear_time = 1
 
-# Area for color objects to appear
-TARGET_AREA = pygame.Rect(200, 150, 400, 300)
+
+TARGET_AREA = pygame.Rect(100, 100, 600, 400)
 TARGET_SIZE = 100
 
-# Functions
-def draw_message(text, color, position):
+
+def draw_message(text, color, position, size=36):
+    font = pygame.font.Font(None, size)
     message = font.render(text, True, color)
     screen.blit(message, position)
 
+def calculate_attention_level(accuracy):
+    if accuracy < 30:
+        return "Low Attention"
+    elif 30 <= accuracy <= 70:
+        return "Medium Attention"
+    else:
+        return "High Attention"
+
+def calculate_stress_index(average_reaction_time):
+    if average_reaction_time < 0.6:
+        return "Low Stress"
+    elif 0.6 <= average_reaction_time < 1.0:
+        return "Moderate Stress"
+    else:
+        return "High Stress"
+
 def main_menu():
-    global TARGET_COLOR, GAME_TIME
+    global TARGET_COLOR, GAME_TIME, difficulty_level
 
     menu_active = True
     while menu_active:
-        screen.fill(WHITE)
+        screen.fill(CORAL_RED)
 
-        draw_message("Welcome to the Color Tapping Game!", BLACK, (200, 50))
+        draw_message("Welcome to the FocusPulse!", BLACK, (200, 50))
         draw_message("Select the color to tap:", BLACK, (200, 150))
 
         color_buttons = []
@@ -74,12 +98,20 @@ def main_menu():
 
         draw_message("Set game time (seconds):", BLACK, (200, 300))
         time_buttons = []
-        for i, time_option in enumerate([15, 30, 60]):
+        for i, time_option in enumerate([60, 120, 180]):  
             button_rect = pygame.Rect(200 + i * 100, 350, 50, 50)
             time_buttons.append((button_rect, time_option))
             draw_message(str(time_option), BLACK, (button_rect.x + 10, button_rect.y + 10))
 
-        draw_message("Click anywhere to start!", BLACK, (200, 450))
+      
+        draw_message("Select difficulty level:", BLACK, (200, 450))
+        difficulty_buttons = []
+        for i, level in enumerate(["Easy", "Medium", "Hard"]):
+            button_rect = pygame.Rect(200 + i * 100, 500, 100, 50)
+            difficulty_buttons.append((button_rect, level))
+            draw_message(level, BLACK, (button_rect.x + 10, button_rect.y + 10))
+
+        draw_message("Designed by GSC", BLUE, (500, 550), size = 20)
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -97,29 +129,37 @@ def main_menu():
                     if button_rect.collidepoint(mouse_x, mouse_y):
                         GAME_TIME = time_option
 
-                if TARGET_COLOR and GAME_TIME:
+                for button_rect, level in difficulty_buttons:
+                    if button_rect.collidepoint(mouse_x, mouse_y):
+                        difficulty_level = level
+
+                if TARGET_COLOR and GAME_TIME and difficulty_level:
                     menu_active = False
 
         pygame.display.flip()
         clock.tick(30)
 
-    return TARGET_COLOR, GAME_TIME
+    return TARGET_COLOR, GAME_TIME, difficulty_level
 
-# Start game
-TARGET_COLOR, GAME_TIME = main_menu()
 
-# Start the game
+TARGET_COLOR, GAME_TIME, difficulty_level = main_menu()
+
+
+if difficulty_level == "Medium":
+    target_appear_time = 0.8
+elif difficulty_level == "Hard":
+    target_appear_time = 0.5
+
+
 game_start_time = time.time()
 
 running = True
 
 while running:
-    screen.fill(WHITE)
-
-    # Draw the target area
+    screen.fill(CORAL_RED)
+    pygame.draw.rect(screen, LIGHT_GREEN, TARGET_AREA)
     pygame.draw.rect(screen, (220, 220, 220), TARGET_AREA, 2)
 
-    # Check events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -128,18 +168,19 @@ while running:
         if event.type == pygame.MOUSEBUTTONDOWN:
             mouse_x, mouse_y = event.pos
 
-            # Check if the click is on a target and hasn't been clicked this round
             if target_rect.collidepoint(mouse_x, mouse_y) and not clicked_this_round:
+                elapsed_time = time.time() - game_start_time
                 if current_color == TARGET_COLOR:
                     correct_taps += 1
-                    correct_tap_points.append((time.time() - game_start_time, correct_taps))  # Append timestamp and correct tap count
+                    reaction_time = time.time() - target_appearance_time
+                    reaction_times.append(reaction_time)
+                    correct_tap_points.append((elapsed_time, correct_taps))
                 else:
                     wrong_taps += 1
-                    wrong_tap_points.append((time.time() - game_start_time, wrong_taps))  # Append timestamp and wrong tap count
-                total_taps = correct_taps + wrong_taps
+                    wrong_tap_points.append((elapsed_time, wrong_taps))
+                total_taps += 1
                 clicked_this_round = True
 
-    # Determine if the target should appear
     if time.time() - start_time >= target_appear_time:
         current_color = random.choice(COLORS)
         target_rect = pygame.Rect(
@@ -147,48 +188,63 @@ while running:
             random.randint(TARGET_AREA.top, TARGET_AREA.bottom - TARGET_SIZE),
             TARGET_SIZE, TARGET_SIZE
         )
+        target_appearance_time = time.time()
         clicked_this_round = False
         start_time = time.time()
 
-        # Track performance
         elapsed_time = time.time() - game_start_time
         performance.append(correct_taps - wrong_taps)
         timestamps.append(elapsed_time)
-
-        # Track total attempts over time
         attempts_over_time.append(correct_taps + wrong_taps)
+        if current_color == TARGET_COLOR:
+            total_targets += 1
 
-    # Draw the target if available
     if current_color:
         pygame.draw.rect(screen, current_color, target_rect)
 
-    # Draw instructions and score
+    remaining_time = GAME_TIME - int(time.time() - game_start_time)
+    draw_message(f"Time Left: {remaining_time}s", BLACK, (SCREEN_WIDTH - 200, 10))
     draw_message(f"Tap the {COLOR_NAMES[TARGET_COLOR]} squares!", BLACK, (10, 10))
     draw_message(f"Score: {correct_taps - wrong_taps}", BLACK, (10, 50))
 
-    # Check if game time is over
-    if time.time() - game_start_time >= GAME_TIME:
+    if remaining_time <= 0:
         running = False
 
-    # Update display
     pygame.display.flip()
     clock.tick(30)
 
-# End game screen
-screen.fill(WHITE)
 
-# Calculate accuracy
-accuracy = (correct_taps / total_taps * 100) if total_taps > 0 else 0
+screen.fill(LIGHT_GREEN)
+
+
+accuracy = ((correct_taps - ((total_targets - correct_taps) * 0.5)) / total_taps * 100) if total_taps > 0 else 0
 final_score = correct_taps - wrong_taps
 
-# Display the results
-draw_message(f"Game Over!", BLACK, (200, 100))
-draw_message(f"Final Score: {final_score}", BLACK, (200, 150))
-draw_message(f"Correct Taps: {correct_taps}", BLACK, (200, 200))
-draw_message(f"Wrong Taps: {wrong_taps}", BLACK, (200, 250))
-draw_message(f"Total Taps: {total_taps}", BLACK, (200, 300))
-draw_message(f"Accuracy: {accuracy:.2f}%", BLACK, (200, 350))
-draw_message("Press any key to exit", BLACK, (200, 400))
+
+total_reaction_time = sum(reaction_times)
+average_reaction_time = total_reaction_time / len(reaction_times) if reaction_times else 0
+
+
+attention_level = calculate_attention_level(accuracy)
+
+
+stress_index = calculate_stress_index(average_reaction_time)
+
+
+draw_message("Game Over!", BLACK, (SCREEN_WIDTH // 2 - 100, 20), size=48)
+draw_message(f"Final Score: {final_score}", BLACK, (200, 70))
+draw_message(f"Correct Taps: {correct_taps}", BLACK, (200, 110))
+draw_message(f"Wrong Taps: {wrong_taps}", BLACK, (200, 150))
+draw_message(f"Total Taps: {total_taps}", BLACK, (200, 200))
+draw_message(f"Accuracy: {accuracy:.2f}%", BLACK, (200, 250))
+draw_message(f"Total Targets Appeared: {total_targets}", BLACK, (200, 300))
+draw_message(f"Attention Level: {attention_level}", BLACK, (200, 350))
+draw_message(f"Stress Index: {stress_index}", BLACK, (200, 400))
+draw_message(f"Avg. Reaction Time: {average_reaction_time:.2f}s", BLACK, (200, 450))
+draw_message("Press any key to exit", BLACK, (200, 500))
+draw_message("Developed by", CORAL_RED, (370, 550))
+draw_message("              GSC", BLUE, (440, 550))
+draw_message("                    ©2025", BLACK, (480, 550))
 
 pygame.display.flip()
 
@@ -202,15 +258,15 @@ while waiting:
 
 pygame.quit()
 
-# Plot performance graph
+
 try:
-    # Plot performance graph
+   
     plt.figure(figsize=(12, 6))
 
-    # Total Attempts (correct + wrong taps) using range(len(attempts_over_time))
+    
     plt.plot(range(len(attempts_over_time)), attempts_over_time, label="Total Attempts", color="blue")
 
-    # Correct Taps
+    
     plt.plot(
         [point[0] for point in correct_tap_points],
         [point[1] for point in correct_tap_points],
@@ -218,26 +274,29 @@ try:
         color="green",
     )
 
-    # Score Over Time
+    
     plt.plot(range(len(performance)), performance, label="Score Over Time", color="orange")
 
-    # Green circles for correct taps
+    
     for timestamp, correct_tap in correct_tap_points:
         plt.scatter(timestamp, correct_tap, color="green", zorder=5)
 
-    # Red circles for wrong taps
+    
     for timestamp, wrong_tap in wrong_tap_points:
         plt.scatter(timestamp, wrong_tap, color="red", zorder=5)
 
-    # Add labels and title
+    
     plt.xlabel("Elapsed Time (s)")
     plt.ylabel("Count")
     plt.title("Game Performance")
     plt.legend()
     plt.grid()
 
-    # Show the plot
+   
+
+   
     plt.show()
 
+    
 except Exception as e:
     print(f"Error occurred while plotting the graph: {e}")
